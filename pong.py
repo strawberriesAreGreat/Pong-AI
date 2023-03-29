@@ -4,30 +4,29 @@ from pygame.locals import *
 
 # Initialize Pygame
 pygame.init()
-score_font = pygame.font.Font(None, 36)
-
-
-# reset the game 
-# reward for the agent
-# play(action) -> direction
-# game_iteration
-# is_collision 
-
+score_font = pygame.font.Font(None, 100)
 
 # Set up game variables
+COLOR_BACKGROUND = (25, 42, 99)
+COLOR_BALL = (204, 255, 232)
+COLOR_A = (187,160,202)
+COLOR_B = (153,247,171)
+COLOR_TEXT = (234,255,168)
+
+
 SCREEN_WIDTH, SCREEN_HEIGHT = 1080, 720
-COLOR_BACKGROUND = (0, 0, 0)
-COLOR_PADDLE = (255, 255, 255)
-COLOR_BALL = (255, 255, 255)
-PADDLE_WIDTH, PADDLE_HEIGHT = 15, 60
-BALL_SIZE = 15
+PADDLE_WIDTH, PADDLE_HEIGHT = 20, 100
+BALL_SIZE = 20
+
+MAX_GAME_SCORE = 3
+GAME_SPEED = 60
 
 
 class Paddle(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
+    def __init__(self, x, y, color):
+        super().__init__() 
         self.image = pygame.Surface((PADDLE_WIDTH, PADDLE_HEIGHT))
-        self.image.fill(COLOR_PADDLE)
+        self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
@@ -61,18 +60,21 @@ class Ball(pygame.sprite.Sprite):
 class PongGame:
 
     def __init__(self):
-        #initializing the game
-        self.score_a = 0
-        self.score_b = 0
-        self.winner = 0
-        
-        # Create game objects
-        self.paddle_a = Paddle(20, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2)
-        self.paddle_b = Paddle(SCREEN_WIDTH - 20 - PADDLE_WIDTH, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2)
-        self.ball = Ball()
-
+        # Init display
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Pretty & Smart Pong")
+        self.clock = pygame.time.Clock()
+
+        #init score
+        self.score_a = 0
+        self.score_b = 0
+
+        #init ball
+        self.ball = Ball()
+
+        #init paddle
+        self.paddle_a = Paddle(20, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2, COLOR_A)
+        self.paddle_b = Paddle(SCREEN_WIDTH - 20 - PADDLE_WIDTH, SCREEN_HEIGHT // 2 - PADDLE_HEIGHT // 2, COLOR_B)
         
     def play_step(self):
 
@@ -92,17 +94,14 @@ class PongGame:
             self.paddle_b.move(5)
 
         # Update
+        self._draw()
         self.ball.update()
         self._is_point()
-        self._is_end()
-        # Draw
-        self._draw()
-        # Delay
-        pygame.time.delay(16)
+        self.clock.tick(GAME_SPEED)
 
-        return (self.winner > 0), self.winner, self.score_a, self.score_b
+        return  self._is_end()
 
-        
+
         # Check for collisions
     def _is_point(self):
             if self.ball.rect.colliderect(self.paddle_a.rect) or self.ball.rect.colliderect(self.paddle_b.rect):
@@ -118,17 +117,17 @@ class PongGame:
 
         #checking for end of game
     def _is_end(self):
-            if self.score_a == 10: 
-                self.score_a = 0
-                self.score_b = 0
-                self.winner = 1
+            if self.score_a == MAX_GAME_SCORE: 
                 print("Game Over")
+                return True, "purple", self.score_a, self.score_b
 
-            if self.score_b == 10: 
-                self.score_a = 0
-                self.score_b = 0
-                self.winner = 2
+            elif self.score_b == MAX_GAME_SCORE: 
+
                 print("Game Over")
+                return True, "green", self.score_b, self.score_a
+            
+            else:
+                return False, 5 , 5, 5
                 
     # Draw game objects
     def _draw(self):
@@ -138,7 +137,7 @@ class PongGame:
         self.screen.blit(self.ball.image, self.ball.rect)
 
         # Display the score
-        score_text = score_font.render(f"{self.score_a} - {self.score_b}", True, COLOR_PADDLE)
+        score_text = score_font.render(f"{self.score_a} - {self.score_b}", True, COLOR_TEXT)
         self.screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, 10))
 
         pygame.display.flip()
@@ -147,9 +146,9 @@ class PongGame:
 if __name__ == "__main__":
     game = PongGame()
     while True:
-        game_over, winner, score_a, score_b = game.play_step()
+        game_over, winner, score_1, score_2 = game.play_step()
 
         if game_over: 
             break
     
-    print('Winner is player ', winner, ' with score ', score_a)
+    print('Winner is player ', winner, ' with score ', score_1)
