@@ -9,6 +9,11 @@ from helper import plot
 MAX_MEMORY = 100_000
 BATCH_SIZE = 1000
 LR = 0.001
+if torch.cuda.is_available():  
+  dev = "cuda:0" 
+else:  
+  dev = "cpu"  
+DEVICE = torch.device(dev)  
 
 class Agent: 
     def __init__(self, player, color):
@@ -21,6 +26,7 @@ class Agent:
         self.enemy = 1 - player
         self.record = 0
         self.model  = Linear_QNet(6, 256, 3)
+        self.model.to(DEVICE)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def get_state(self, game):
@@ -31,16 +37,17 @@ class Agent:
         enemy_paddle_y = game.paddles[self.enemy].rect.y 
 
         state = [ 
-            game.is_top(paddle),
-            game.is_bottom(paddle),
             player_paddle_y,
             enemy_paddle_y,
             game.ball.rect.y,
-            game.ball.rect.x
-
+            game.ball.rect.x,
+            game.ball.dx,
+            game.ball.dy
         ]
-        return state
+        return state 
        
+    
+    
     def remember(self, state, action, reward, next_state, game_over):
         self.memory.append( (state, action, reward, next_state, game_over) )
 
@@ -58,7 +65,7 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 50 - self.n_games
+        self.epsilon = 10 - self.n_games
         final_move = [0,0,0]
         if random.randint(0, 200) < self.epsilon:
             move = random.randint(0,2)
@@ -66,16 +73,17 @@ class Agent:
             #print("Move ", final_move)
         else:
             # predict move
-            state0 = torch.tensor(state, dtype=torch.float)
+            state0 = torch.tensor(state, dtype=torch.float).to(DEVICE)
             prediction = self.model(state0)
             move = torch.argmax(prediction).item()
+            #print("Move ", final_move)
             final_move[move] = 1
 
         return final_move
 
 def train():
-    plot_scores = [[], []]
-    plot_mean_scores = [[], []]
+    plot_scores = [[],[]]
+    plot_mean_scores = [[],[]]
     total_score = [0, 0]
     game = PongGameAI()
     agents = [ 
@@ -93,10 +101,9 @@ def train():
             final_moves[i] = agent.get_action(state_old)
         
         # perform move and get new state
-        rewards, game_over, winner, scores = game.play_step( final_moves[0], final_moves[1] )
+        rewards, game_over, scores = game.play_step( final_moves[0], final_moves[1] )
 
         for i, agent in enumerate(agents):
-
             state_new = agent.get_state(game)
 
             # train short memory
@@ -118,15 +125,6 @@ def train():
                     if scores[i] > agent.record:
                         agent.record = scores[i]
                         agent.model.save( agent.name + '.model')
-
-                    print('Game', agents[i].n_games, 'Score', scores[i], 'Record:', agents[i].record)
-
-                    #plot_scores.append(rewards[i])
-                    #total_score += scores[i]
-                    #mean_score = total_score / agents[i].n_games
-                    #plot_mean_scores.append(mean_score)
-                
-                    #plot(plot_scores, plot_mean_scores)
                     
                     plot_scores[i].append(rewards[i])
                     total_score[i] += scores[i]
@@ -136,6 +134,12 @@ def train():
                     plots.append(plot_mean_scores[i])
                 
                 plot(plots[0], plots[1], plots[2], plots[3])
+
+        if game_over:
+            game.count += 1
+            print('Game', agents[i].n_games, ':\nPurple Score', scores[0], ' Record:', agents[0].record)
+            print('Green Score', scores[1], ' Record:', agents[1].record)
+                
 
             
 if __name__ == '__main__':
